@@ -80,11 +80,10 @@ def list_github_pages(repository, token):
         f"/repos/{quote(owner)}/{quote(name)}/contents/Akce",
         token,
     )
-    public_site = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
     return [
         {
             "title": item["name"][:-5],
-            "path": (public_site + "/Akce/" if public_site else "/Akce/") + item["name"],
+            "path": "/Akce/" + item["name"],
         }
         for item in result
         if item.get("type") == "file" and item.get("name", "").endswith(".html")
@@ -99,6 +98,15 @@ def save_github_page(repository, token, filename, content):
         "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
     }
     github_request("PUT", path, token, data)
+
+
+def read_github_page(repository, token, filename):
+    owner, name = repository.split("/", 1)
+    path = f"/repos/{quote(owner)}/{quote(name)}/contents/Akce/{quote(filename)}"
+    result = github_request("GET", path, token)
+    if not isinstance(result, dict) or result.get("encoding") != "base64":
+        raise GithubApiError(None, "GitHub returned an invalid page.")
+    return base64.b64decode(result["content"])
 
 
 def make_slug(title):
@@ -188,7 +196,28 @@ class ProjectHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if urlsplit(self.path).path == "/api/pages":
+        path = urlsplit(self.path).path
+        page_match = re.fullmatch(r"/Akce/([a-z0-9]+(?:-[a-z0-9]+)*\.html)", path)
+        settings = github_settings()
+        if page_match and settings:
+            try:
+                body = read_github_page(settings[0], settings[1], page_match.group(1))
+            except GithubApiError as error:
+                if error.status == 404:
+                    self.send_error(404, "Akce nebyla nalezena.")
+                else:
+                    self.send_json(502, {"error": "Stránku akce se nepodařilo načíst z GitHubu."})
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == "/api/pages":
             settings = github_settings()
             try:
                 if settings:
@@ -381,9 +410,7 @@ class ProjectHandler(SimpleHTTPRequestHandler):
             else:
                 page_file.write_text(page, encoding="utf-8")
 
-            public_site = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
-            path = f"{public_site}/Akce/{filename}" if public_site else "/Akce/" + filename
-            self.send_json(201, {"path": path})
+            self.send_json(201, {"path": "/Akce/" + filename})
 
         except (json.JSONDecodeError, UnicodeDecodeError):
             self.send_json(400, {"error": "Požadavek obsahuje neplatná data."})

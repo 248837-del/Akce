@@ -1,3 +1,4 @@
+import base64
 import json
 import tempfile
 import threading
@@ -19,6 +20,7 @@ from server import (
     list_github_pages,
     make_qr_svg,
     normalize_account,
+    read_github_page,
 )
 
 
@@ -39,11 +41,8 @@ class PaymentQrTests(unittest.TestCase):
         self.assertEqual(raised.exception.status, 403)
         self.assertEqual(str(raised.exception), "Resource not accessible")
 
-    def test_github_page_links_include_project_pages_prefix(self):
-        with patch.dict(
-            "server.os.environ",
-            {"PUBLIC_SITE_URL": "https://248837-del.github.io/Akce"},
-        ), patch(
+    def test_github_page_links_use_render_event_route(self):
+        with patch(
             "server.github_request",
             return_value=[{"type": "file", "name": "test-akce.html"}],
         ):
@@ -53,9 +52,44 @@ class PaymentQrTests(unittest.TestCase):
             pages,
             [{
                 "title": "test-akce",
-                "path": "https://248837-del.github.io/Akce/Akce/test-akce.html",
+                "path": "/Akce/test-akce.html",
             }],
         )
+
+    def test_reads_github_page_content(self):
+        expected = b"<!doctype html><title>Test</title>"
+        response = {
+            "encoding": "base64",
+            "content": base64.b64encode(expected).decode("ascii"),
+        }
+        with patch("server.github_request", return_value=response):
+            page = read_github_page("248837-del/Akce", "token", "test-akce.html")
+
+        self.assertEqual(page, expected)
+
+    def test_event_route_serves_github_page_immediately(self):
+        page = b"<!doctype html><title>Nova akce</title>"
+        github_response = {
+            "encoding": "base64",
+            "content": base64.b64encode(page).decode("ascii"),
+        }
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ProjectHandler)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            with patch(
+                "server.github_settings",
+                return_value=("248837-del/Akce", "token"),
+            ), patch("server.github_request", return_value=github_response):
+                with urlopen(
+                    f"http://127.0.0.1:{server.server_port}/Akce/nova-akce.html"
+                ) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.read(), page)
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
 
     def test_normalizes_czech_account_to_iban(self):
         self.assertEqual(

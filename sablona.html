@@ -145,7 +145,7 @@
         return;
       }
   
-      window.location.href = result.path;
+      window.location.href = window.apiUrl(result.path);
     } catch (error) {
       zprava.textContent = 'Server neběží nebo neodpovídá.';
       console.error(error);

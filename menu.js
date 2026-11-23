@@ -12,7 +12,7 @@ fetch(window.apiUrl('/api/pages'))
       const link = document.createElement('a');
 
       link.className = 'menu-odkaz';
-      link.href = page.path;
+      link.href = window.apiUrl(page.path);
       link.textContent = page.title;
 
       item.appendChild(link);
