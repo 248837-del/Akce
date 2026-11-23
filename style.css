@@ -1,0 +1,608 @@
+body	{font-family: system-ui, -apple-system, sans-serif;
+	background-color: #f6f8fc;
+	color: #1e293b;
+	padding: 40px;
+	margin: 0;}
+
+/* #region Tlačítka */	
+button {
+	border: 0;
+	border-radius: 12px;
+	padding: 10px 16px;
+	background-color: #2563eb;
+	color: white;
+	font: inherit;
+	font-weight: 650;
+	cursor: pointer;
+	box-shadow: 0 3px 8px rgb(37 99 235 / 18%);
+	transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;}
+
+button:hover {
+	background-color: #1d4ed8;
+	box-shadow: 0 5px 12px rgb(37 99 235 / 24%);
+	transform: translateY(-1px);}
+
+button:focus-visible {
+	outline: 3px solid #93c5fd;
+	outline-offset: 3px;}
+
+button:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;}
+
+button:disabled:hover {
+	box-shadow: none;
+	transform: none;}
+
+.button_home	{font-size: 20px;
+	padding: 10px 20px;
+	position: absolute;
+	top: 1.5rem;
+	right: 1rem;
+	background-color: #2563eb;
+	color: white;
+	border-radius: 20px;
+	cursor: pointer;}
+
+.button_sablona_vytvorit	{width: 40vw;
+	position: static;
+	margin-top: 5vh;
+	margin-left: 20vw;
+	background-color: #2563eb;
+	color: white;}
+
+.form-page .button_home,
+.form-page .button_sablona_vytvorit {
+	background-color: #2563eb;
+	color: white;}
+
+.form-page .button_home:hover,
+.form-page .button_sablona_vytvorit:hover {
+	background-color: #1d4ed8;}
+
+.button_VytvoritNovouAkci	{margin-top: 8vh;
+	margin-left: 35vw;
+	width: 20vw;
+color: white;
+padding: 12px 18px;}
+/* #endregion */
+
+h2	{color: #1d4ed8;
+	margin-top: 0;}
+
+.menu	{font-size: 20px;
+	padding: 10px 20px;
+	position: absolute;
+	top: 1.5rem;
+	left: 1rem;
+	z-index: 100;
+	list-style: none;
+	color: white;
+	background-color: #1e3a8a;
+	border-radius: 20px;
+	cursor: pointer;
+	margin: 0;}
+
+.podmenu{display: none;}
+
+li:hover .podmenu{display: block;
+	padding: 10px 30px;}
+
+.menu-odkaz{text-decoration: none;
+ 	color: inherit;}
+
+.menu-odkaz:hover{color: #93c5fd;}
+
+.zadani {margin-left: 15vw;
+	margin-top: 2vh;}
+
+.platce-nakupu {
+	display: grid;
+	grid-template-columns: max-content minmax(15rem, 24vw);
+	align-items: flex-start;
+	column-gap: 1.5rem;}
+
+.platce-nakupu input {
+	box-sizing: border-box;
+	max-width: 100%;}
+
+@media (max-width: 640px) {
+	.platce-nakupu {
+		grid-template-columns: minmax(0, 1fr);}
+}
+
+.zadani_1{display: flex; gap: 5vw;
+	margin-top: 33vh;
+	margin-left: 15vw;}
+
+.rozlozeni{display: block;
+	margin-top: 10vh;
+	margin-left: 10vw;}
+
+/* #region AddTlacitko */	
+details {
+  width: min(100%, 360px);
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: white;}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;}
+
+#seznamLidi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 10px;}
+
+#seznamLidi br {
+  display: none;
+}
+
+#seznamLidi label {
+  display: flex;
+  align-items: center;
+  padding: 1px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#seznamLidi label:hover {
+  background: #f1f5f9;
+}
+
+#seznamLidi input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  margin: 0;
+  accent-color: #2563eb;
+}
+/* #endregion */	
+.ucastnici {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 10px;
+  font-size: 16px;
+  list-style: none;
+  padding: 0;
+  overflow-x: auto;}
+
+.ucastnici li {
+  flex: 0 0 auto;
+  white-space: nowrap;}
+
+.checklist-wrap {
+  overflow-x: auto;}
+
+.checklist {
+  border-collapse: collapse;
+  background: white;}
+
+.checklist tr > :first-child {
+  position: sticky;
+  z-index: 2;
+  left: 0;
+  background: white;}
+
+.checklist thead tr > :first-child {
+  z-index: 4;}
+
+.checklist tfoot tr > :first-child {
+  background: #e2e8f0;}
+
+.checklist th,
+
+.checklist td {
+  border: 1px solid #cbd5e1;
+  padding: 8px 12px;
+  text-align: center;}
+
+.checklist th:nth-child(n+4),
+.checklist td:nth-child(n+4) {
+  width: 5rem;
+  min-width: 5rem;}
+
+.checklist .podil-kolecko {
+  width: 2rem;
+  height: auto;
+}
+
+.checklist input.podil-kolecko {
+  width: 3.5rem;
+  height: auto;
+}
+
+.cena,
+.mnozstvi {
+	padding: 0 5px;
+  font-size: 0.8rem;}
+
+.produkt {
+  font-size: 1.25rem;}
+
+.checklist .podil-select {
+  width: auto;
+  height: auto;
+  min-width: 3.5rem;
+}
+
+.checklist .input {
+  width: 3rem !important;
+  min-width: 0.2rem !important;
+  max-width: 5rem !important;
+}
+
+.checklist tfoot {
+  font-weight: 700;
+  background-color: #e2e8f0;
+}
+
+.souhrn-vypoctu {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+
+.souhrn-vypoctu.chyba {
+  color: #b91c1c;
+}
+
+.stav-ulozeni {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.stav-ulozeni.chyba {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.checklist tfoot td {
+  vertical-align: top;
+}
+
+.qr-platba {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: white;
+}
+
+.qr-platba h2 {
+  margin: 0 0 10px;
+  color: inherit;
+  font-size: 1.1rem;
+}
+
+.qr-platba label {
+  display: block;
+  font-weight: 600;
+}
+
+.qr-platba input {
+  display: block;
+  box-sizing: border-box;
+  width: min(100%, 24rem);
+  margin-top: 4px;
+  padding: 8px;
+}
+
+.qr-platba p {
+  margin: 8px 0 0;
+}
+
+.checklist tfoot button {
+  margin-top: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.checklist tfoot button:disabled {
+  cursor: not-allowed;
+}
+
+.qr-vysledek img {
+  display: block;
+  width: 180px;
+  max-width: 100%;
+  height: auto;
+  margin-top: 8px;
+}
+
+.form-page {
+  min-height: 100vh;
+}
+
+.form-main {
+  width: min(820px, 100%);
+  margin: 0 auto;
+}
+
+.form-heading {
+  margin: 105px 0 22px;
+}
+
+.form-heading h1 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.form-page #zprava {
+  margin: 0 0 12px;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.form-page #zprava:empty {
+  display: none;
+}
+
+.form-page .zadani_1,
+.form-page .zadani {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 22px;
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 5px 16px rgb(30 58 138 / 5%);
+}
+
+.form-page .zadani_1 {
+  display: grid;
+  grid-template-columns: 1fr 0.65fr;
+  gap: 18px;
+}
+
+.form-page label {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: #334155;
+  font-weight: 650;
+}
+
+.form-page input[type="text"],
+.form-page input[type="date"],
+.form-page select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: white;
+  color: #1e293b;
+  font: inherit;
+}
+
+.form-page input[type="text"]:focus,
+.form-page input[type="date"]:focus,
+.form-page select:focus {
+  border-color: #3b82f6;
+  outline: 3px solid rgb(59 130 246 / 16%);
+}
+
+.form-page input:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.form-page .zadani {
+  display: grid;
+  gap: 18px;
+  margin-left: auto;
+}
+
+.form-page .zadani details {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.participant-actions {
+  margin-top: 12px;
+}
+
+.participant-actions button {
+  padding: 7px 12px;
+  font-size: 0.9rem;
+}
+
+.form-page .nakupni-soubor input[type="file"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px;
+  border: 1px dashed #a9bddb;
+  border-radius: 10px;
+  background: #f8faff;
+  color: #475569;
+}
+
+.form-page .platce-nakupu {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.form-page #stavUctu {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.form-page .button_sablona_vytvorit {
+  display: block;
+  width: auto;
+  min-width: 190px;
+  margin: 20px auto 0;
+}
+
+@media (max-width: 640px) {
+  .form-page {
+    padding: 20px;
+  }
+
+  .form-heading {
+    margin-top: 100px;
+  }
+
+  .form-page .zadani_1,
+  .form-page .platce-nakupu {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-page .zadani_1,
+  .form-page .zadani {
+    padding: 18px;
+  }
+}
+
+body.event-page {
+  min-height: 100vh;
+  padding: 32px clamp(16px, 4vw, 48px) 48px;
+  background: #f6f8fc;
+}
+
+.event-page .event-title,
+.event-page .event-main {
+  width: min(1180px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.event-page .event-title {
+  margin-top: 92px;
+  margin-bottom: 22px;
+  color: #1e3a8a;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.event-page .rozlozeni {
+  margin: 0;
+}
+
+.event-page .checklist-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 5px 16px rgb(30 58 138 / 6%);
+}
+
+.event-page .checklist {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.event-page .checklist th,
+.event-page .checklist td {
+  padding: 10px 12px;
+  border: 0;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.event-page .checklist thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #1e3a8a;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.event-page .checklist thead tr > :first-child {
+  z-index: 4;
+  background: #1e3a8a;
+}
+
+.event-page .checklist tr > :first-child {
+  background: white;
+}
+
+.event-page .checklist tbody tr:nth-child(even) td:not(:first-child) {
+  background: #f8faff;
+}
+
+.event-page .checklist tbody th {
+  color: #334155;
+  font-weight: 650;
+  text-align: left;
+}
+
+.event-page .checklist input.podil-kolecko {
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  color: #1e293b;
+  font: inherit;
+}
+
+.event-page .checklist input.podil-kolecko:focus {
+  border-color: #3b82f6;
+  outline: 3px solid rgb(59 130 246 / 16%);
+}
+
+.event-page .checklist tfoot {
+  background: #eaf1ff;
+  color: #1e3a8a;
+}
+
+.event-page .checklist tfoot tr > :first-child {
+  background: #eaf1ff;
+}
+
+.event-page .souhrn-vypoctu {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  background: white;
+}
+
+.event-page .stav-ulozeni {
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.event-page .stav-ulozeni:empty {
+  display: none;
+}
+
+.event-page .qr-platba {
+  border-color: #dbe4f0;
+  box-shadow: 0 5px 16px rgb(30 58 138 / 5%);
+}
+
+@media (max-width: 640px) {
+  body.event-page {
+    padding: 20px;
+  }
+
+  .event-page .event-title {
+    margin-top: 92px;
+  }
+
+  .event-page .checklist th,
+  .event-page .checklist td {
+    padding: 8px;
+  }
+}

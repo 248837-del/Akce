@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css?v=5">
+  <script src="api-config.js"></script>
+  <script src="menu.js"></script>
+  <title>Nová akce</title>
+</head>
+<body class="form-page">
+
+<button class="button_home" onclick="window.location.href = 'PROJEKT.html';">Úvod</button>
+
+<ul class="menu">
+  <li>Menu
+    <ul class="podmenu" id="pageMenu"></ul>
+    <ul class="podmenu" onclick="location.href='lidi.json'">Seznam lidí</ul>
+  </li>
+</ul>
+
+<main class="form-main">
+  <header class="form-heading">
+    <h1>Vytvořit novou akci</h1>
+  </header>
+
+  <p id="zprava" role="status"></p>
+
+  <form class="zadani_1" id="novaAkce">
+  <div>
+    <label for="NazevAkce">Název akce:</label><br>
+    <input type="text" id="NazevAkce" name="Nazev" required>
+  </div>
+
+  <div>
+    <label for="DatumAkce">Datum:</label><br>
+    <input type="date" id="DatumAkce" name="Datum">
+  </div>
+
+  </form>
+
+  <form class="zadani">
+    <details>
+      <summary>Účastníci — vybrat</summary>
+      <div class="participant-actions">
+        <button type="button" id="vybratVsechnyUcastniky">Vybrat všechny</button>
+      </div>
+      <div id="seznamLidi"></div>
+    </details>
+
+    <div class="nakupni-soubor">
+      <label for="Nakup">Nákupní seznam</label>
+    <input type="file" id="Nakup" name="Nakup" accept=".json,application/json">
+    </div>
+
+    <div class="platce-nakupu">
+      <div>
+        <label for="PlatceNakupu">Kdo zaplatil celý nákup?</label><br>
+        <select id="PlatceNakupu" name="PlatceNakupu">
+          <option value="">Vyber plátce</option>
+        </select>
+      </div>
+      <div>
+        <label for="Ucet">Účet plátce pro QR platby:</label><br>
+        <input type="text" id="Ucet" name="Ucet"
+          autocomplete="off" placeholder="např. 123456789/0001" disabled>
+        <p id="stavUctu" role="status">Nejprve vyber plátce.</p>
+      </div>
+    </div>
+  </form>
+
+  <button class="button_sablona_vytvorit" type="submit" form="novaAkce" id="vytvorit">Vytvořit akci</button>
+</main>
+
+<script>//komunikace se servrem, tvorba novych stránek a přesměrování na ně
+    document.getElementById('novaAkce').addEventListener('submit', async function(event) {
+    event.preventDefault();
+  
+    const zprava = document.getElementById('zprava');
+    const soubor = document.getElementById('Nakup').files[0];
+  
+    if (!soubor) {
+      zprava.textContent = 'Vyber soubor nákupního seznamu.';
+      return;
+    }
+  
+    let nakupniSeznam;
+    try {
+      nakupniSeznam = JSON.parse(await soubor.text());
+    } catch {
+      zprava.textContent = 'Soubor není platný JSON.';
+      return;
+    }
+  
+    const platnySeznam =
+      nakupniSeznam?.currency === 'CZK' &&
+      Array.isArray(nakupniSeznam.items) &&
+      nakupniSeznam.items.length > 0 &&
+      nakupniSeznam.items.every(polozka =>
+        typeof polozka.product === 'string' &&
+        polozka.product.trim() !== '' &&
+        Number.isFinite(polozka.quantity) &&
+        polozka.quantity > 0 &&
+        Number.isFinite(polozka.line_total_czk) &&
+        polozka.line_total_czk >= 0
+      );
+  
+    if (!platnySeznam) {
+      zprava.textContent = 'JSON musí obsahovat platné položky, množství a cenu v korunách.';
+      return;
+    }
+
+    const ucastnici = [...document.querySelectorAll('input[name="ucastnici"]:checked')]
+      .map(checkbox => checkbox.value);
+    const platce = document.getElementById('PlatceNakupu').value;
+    if (ucastnici.length > 0 && !ucastnici.includes(platce)) {
+      zprava.textContent = 'Vyber, kdo zaplatil celý nákup.';
+      return;
+    }
+
+    const ucet = document.getElementById('Ucet').value.trim();
+    if (platce && !ucet) {
+      zprava.textContent = 'Zadej účet vybraného plátce pro QR platby.';
+      return;
+    }
+  
+    try {
+      const response = await fetch(window.apiUrl('/api/pages'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${document.getElementById('NazevAkce').value.trim()} - ${document.getElementById('DatumAkce').value}`,
+          date: document.getElementById('DatumAkce').value,
+          account: ucet,
+          payer: platce,
+          participants: ucastnici,
+          shoppingList: nakupniSeznam
+        })
+      });
+  
+      const result = await response.json();
+  
+      if (!response.ok) {
+        zprava.textContent = result.error || 'Stránku se nepodařilo vytvořit.';
+        return;
+      }
+  
+      window.location.href = result.path;
+    } catch (error) {
+      zprava.textContent = 'Server neběží nebo neodpovídá.';
+      console.error(error);
+    }
+  });
+</script>
+
+<script>//načtení seznamu lidí
+async function nactiLidi() {
+  const odpoved = await fetch('lidi.json');
+  if (!odpoved.ok) throw new Error('Seznam lidí se nepodařilo načíst.');
+
+  const lidi = await odpoved.json();
+  const seznam = document.getElementById('seznamLidi');
+  const vybratVsechny = document.getElementById('vybratVsechnyUcastniky');
+  const platceSelect = document.getElementById('PlatceNakupu');
+  const ucetInput = document.getElementById('Ucet');
+  const stavUctu = document.getElementById('stavUctu');
+  const klicUctuPlatcu = 'ucty-platcu';
+  let uctyPlatcu = Object.create(null);
+  let lzeUkladatUcty = true;
+
+  try {
+    const ulozeneUcty = localStorage.getItem(klicUctuPlatcu);
+    if (ulozeneUcty !== null) {
+      const nacteneUcty = JSON.parse(ulozeneUcty);
+      if (
+        !nacteneUcty ||
+        typeof nacteneUcty !== 'object' ||
+        Array.isArray(nacteneUcty) ||
+        Object.values(nacteneUcty).some(ucet => typeof ucet !== 'string')
+      ) {
+        throw new Error('Uložené účty nemají platný formát.');
+      }
+      uctyPlatcu = Object.assign(Object.create(null), nacteneUcty);
+    }
+  } catch (error) {
+    lzeUkladatUcty = false;
+    stavUctu.textContent = 'Účty plátců se nepodařilo načíst nebo uložit.';
+    console.error(error);
+  }
+
+  function aktualizujUcetPlatce() {
+    const platce = platceSelect.value;
+    ucetInput.disabled = !platce;
+    ucetInput.value = platce ? (uctyPlatcu[platce] || '') : '';
+    if (lzeUkladatUcty) {
+      stavUctu.textContent = platce
+        ? (ucetInput.value
+          ? 'Účet je uložen pro vybraného plátce v tomto prohlížeči.'
+          : 'Zadej účet plátce; uloží se pro příští akce.')
+        : 'Nejprve vyber plátce.';
+    }
+  }
+
+  ucetInput.addEventListener('change', () => {
+    const platce = platceSelect.value;
+    if (!platce || !lzeUkladatUcty) {
+      return;
+    }
+
+    const ucet = ucetInput.value.trim();
+    if (ucet) {
+      uctyPlatcu[platce] = ucet;
+    } else {
+      delete uctyPlatcu[platce];
+    }
+
+    try {
+      localStorage.setItem(klicUctuPlatcu, JSON.stringify(uctyPlatcu));
+      stavUctu.textContent = ucet
+        ? 'Účet plátce byl uložen pro další akce.'
+        : 'Účet plátce byl odebrán.';
+    } catch (error) {
+      lzeUkladatUcty = false;
+      stavUctu.textContent = 'Účet plátce se nepodařilo uložit.';
+      console.error(error);
+    }
+  });
+
+  platceSelect.addEventListener('change', aktualizujUcetPlatce);
+
+  function aktualizujPlatce() {
+    const puvodniPlatce = platceSelect.value;
+    const vybrani = [...document.querySelectorAll('input[name="ucastnici"]:checked')];
+    platceSelect.replaceChildren(new Option('Vyber plátce', ''));
+
+    for (const checkbox of vybrani) {
+      platceSelect.add(new Option(checkbox.value, checkbox.value));
+    }
+
+    if (vybrani.some(checkbox => checkbox.value === puvodniPlatce)) {
+      platceSelect.value = puvodniPlatce;
+    }
+    aktualizujUcetPlatce();
+    aktualizujTlacitkoVyberu();
+  }
+
+  function aktualizujTlacitkoVyberu() {
+    const ucastnici = [...seznam.querySelectorAll('input[name="ucastnici"]')];
+    const vsichniVybrani = ucastnici.length > 0 && ucastnici.every(checkbox => checkbox.checked);
+    vybratVsechny.textContent = vsichniVybrani ? 'Zrušit výběr' : 'Vybrat všechny';
+    vybratVsechny.disabled = ucastnici.length === 0;
+    vybratVsechny.setAttribute('aria-pressed', String(vsichniVybrani));
+  }
+
+  vybratVsechny.addEventListener('click', () => {
+    const ucastnici = [...seznam.querySelectorAll('input[name="ucastnici"]')];
+    const vybrat = !ucastnici.every(checkbox => checkbox.checked);
+    ucastnici.forEach(checkbox => {
+      checkbox.checked = vybrat;
+    });
+    aktualizujPlatce();
+  });
+
+  for (const jmeno of lidi) {
+    const popisek = document.createElement('label');
+    const checkbox = document.createElement('input');
+
+    checkbox.type = 'checkbox';
+    checkbox.name = 'ucastnici';
+    checkbox.value = jmeno;
+    checkbox.addEventListener('change', aktualizujPlatce);
+
+    popisek.append(checkbox, document.createTextNode(` ${jmeno}`));
+    seznam.append(popisek, document.createElement('br'));
+  }
+
+  aktualizujPlatce();
+}
+
+nactiLidi().catch(console.error);
+
+</script>
+
+
+
+</body>
+</html>

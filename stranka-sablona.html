@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../style.css?v=4">
+  <title>{{TITULEK}}</title>
+</head>
+<body class="event-page" data-account="{{UCET}}" data-payer="{{PLATCE}}">
+  <button class="button_home" onclick="location.href='../PROJEKT.html'">
+    HOME
+  </button>
+
+  <ul class="menu">
+    <li>Menu
+      <ul class="podmenu" id="pageMenu"></ul>
+      <ul class="podmenu" onclick="location.href='../lidi.json'">Seznam Lidí</ul>
+    </li>
+  </ul>
+
+<h1 class="event-title">{{TITULEK}}</h1>
+
+<main class="event-main">
+<section class="rozlozeni">
+  <div class="checklist-wrap">
+    <table class="checklist">
+      <colgroup>
+        <col style="width: 8rem">
+        <col style="width: 4.5rem">
+        <col style="width: 5rem">
+      </colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="produkt" >Produkt</th>
+          <th scope="col" class="mnozstvi">Množství</th>
+          <th scope="col" class="cena">Cena</th>
+          {{CHECKLIST_HEADERS}}
+        </tr>
+      </thead>
+      <tbody>
+        {{CHECKLIST_ROWS}}
+      </tbody>
+    </table>
+  </div>
+</section>
+</main>
+
+<script src="../api-config.js"></script>
+<script src="../menu.js"></script>
+<script src="../vypocet.js?v=3"></script>
+<script src="../platba.js?v=6"></script>
+
+</body>
+</html>

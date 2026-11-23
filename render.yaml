@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: akce-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: GITHUB_REPOSITORY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: PUBLIC_SITE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
