@@ -78,15 +78,29 @@ if (typeof document !== "undefined") {
   stavUlozeni.setAttribute("aria-live", "polite");
   rozlozeni.append(stavUlozeni);
 
-  const klicUlozeni = `podily-akce:${window.location.pathname}`;
+  const eventSlug = decodeURIComponent(window.location.pathname.split("/").pop())
+    .replace(/\.html$/i, "");
+  const klicUlozeni = `podily-akce:${eventSlug}`;
+  const staryKlicUlozeni = `podily-akce:${window.location.pathname}`;
+  const adresaSdilenehoStavu = window.apiUrl(
+    `/api/state/${encodeURIComponent(eventSlug)}`
+  );
+  const cekajiciZmeny = new Map();
+  let casovacUlozeni;
+  let nacitaniSdilenehoStavu = false;
+  let sdileniAktivni = false;
+  let chybaSdileniZobrazena = false;
+  let sdileneHodnotyInicializovany = false;
 
   function ulozPodily() {
     const vstupy = Array.from(tabulka.tBodies[0].querySelectorAll("input.podil-kolecko"));
     const hodnoty = vstupy.map(input => input.value);
     try {
       localStorage.setItem(klicUlozeni, JSON.stringify(hodnoty));
-      stavUlozeni.classList.remove("chyba");
-      stavUlozeni.textContent = "Vyplněné podíly byly automaticky uložené.";
+      if (!sdileniAktivni) {
+        stavUlozeni.classList.remove("chyba");
+        stavUlozeni.textContent = "Vyplněné podíly jsou uložené v tomto prohlížeči.";
+      }
     } catch (error) {
       stavUlozeni.classList.add("chyba");
       stavUlozeni.textContent = "Vyplněné podíly se nepodařilo uložit.";
@@ -97,7 +111,11 @@ if (typeof document !== "undefined") {
   function obnovPodily() {
     let ulozene;
     try {
-      ulozene = JSON.parse(localStorage.getItem(klicUlozeni));
+      const soubor = localStorage.getItem(klicUlozeni) ??
+        (staryKlicUlozeni !== klicUlozeni
+          ? localStorage.getItem(staryKlicUlozeni)
+          : null);
+      ulozene = soubor === null ? null : JSON.parse(soubor);
     } catch (error) {
       stavUlozeni.classList.add("chyba");
       stavUlozeni.textContent = "Uložené podíly se nepodařilo načíst.";
@@ -115,6 +133,145 @@ if (typeof document !== "undefined") {
         input.value = ulozene[index];
       }
     });
+  }
+
+  function klicBunky(input) {
+    const radky = Array.from(tabulka.tBodies[0].rows);
+    const indexRadku = radky.indexOf(input.closest("tr"));
+    return `${indexRadku}:${input.dataset.participantIndex}`;
+  }
+
+  function nastavStavSdileni(zprava, chyba = false) {
+    stavUlozeni.classList.toggle("chyba", chyba);
+    stavUlozeni.textContent = zprava;
+  }
+
+  function hodnotyPocatecnihoSdileni(sharedValues) {
+    const values = {};
+    tabulka.tBodies[0].querySelectorAll("input.podil-kolecko").forEach(input => {
+      const cellKey = klicBunky(input);
+      if (input.value !== "0" && !Object.prototype.hasOwnProperty.call(sharedValues, cellKey)) {
+        values[cellKey] = input.value;
+      }
+    });
+    return values;
+  }
+
+  async function odpovedApi(response) {
+    let result;
+    try {
+      result = await response.json();
+    } catch (error) {
+      throw new Error("Server vrátil neplatnou odpověď.");
+    }
+    if (!response.ok) {
+      throw new Error(result.error || "Sdílený stav se nepodařilo uložit.");
+    }
+    return result;
+  }
+
+  async function ulozCekajiciZmeny() {
+    if (!sdileniAktivni || cekajiciZmeny.size === 0) {
+      return;
+    }
+
+    const zmeny = Array.from(cekajiciZmeny.entries());
+    try {
+      for (const [cellKey, value] of zmeny) {
+        await odpovedApi(await fetch(adresaSdilenehoStavu, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cell_key: cellKey, value }),
+        }));
+        if (cekajiciZmeny.get(cellKey) === value) {
+          cekajiciZmeny.delete(cellKey);
+        }
+      }
+      if (cekajiciZmeny.size === 0) {
+        nastavStavSdileni("Změny jsou uložené a sdílené s ostatními.");
+      }
+    } catch (error) {
+      if (!chybaSdileniZobrazena) {
+        console.error("Sdílení počítadel se nepodařilo:", error);
+        chybaSdileniZobrazena = true;
+      }
+      nastavStavSdileni(
+        "Změnu se nepodařilo sdílet; zkusíme ji znovu. Zatím je uložená v tomto prohlížeči.",
+        true
+      );
+    }
+  }
+
+  function naplanujUlozeniSdileneZmeny(input) {
+    if (!input.validity.valid || (input.value !== "" && Number(input.value) > 999)) {
+      return;
+    }
+    cekajiciZmeny.set(klicBunky(input), input.value);
+    clearTimeout(casovacUlozeni);
+    casovacUlozeni = setTimeout(ulozCekajiciZmeny, 350);
+  }
+
+  async function synchronizujSdilenePodily() {
+    if (nacitaniSdilenehoStavu || document.hidden) {
+      return;
+    }
+    nacitaniSdilenehoStavu = true;
+    try {
+      const response = await fetch(adresaSdilenehoStavu, { cache: "no-store" });
+      const result = await odpovedApi(response);
+      const sharedValues = result.values;
+      if (!sharedValues || typeof sharedValues !== "object" || Array.isArray(sharedValues)) {
+        throw new Error("Server vrátil neplatný sdílený stav.");
+      }
+
+      sdileniAktivni = true;
+      chybaSdileniZobrazena = false;
+      nastavStavSdileni("Sdílení je aktivní — změny ostatních se průběžně načítají.");
+
+      if (!sdileneHodnotyInicializovany) {
+        sdileneHodnotyInicializovany = true;
+        const initialValues = hodnotyPocatecnihoSdileni(sharedValues);
+        if (Object.keys(initialValues).length > 0) {
+          await odpovedApi(await fetch(adresaSdilenehoStavu, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ values: initialValues }),
+          }));
+        }
+      }
+
+      let updated = false;
+      tabulka.tBodies[0].querySelectorAll("input.podil-kolecko").forEach(input => {
+        const cellKey = klicBunky(input);
+        const sharedValue = sharedValues[cellKey];
+        if (
+          !cekajiciZmeny.has(cellKey) &&
+          typeof sharedValue === "string" &&
+          (sharedValue === "" || /^\d{1,3}$/.test(sharedValue)) &&
+          input.value !== sharedValue
+        ) {
+          input.value = sharedValue;
+          updated = true;
+        }
+      });
+      if (updated) {
+        aktualizujVysledek();
+        ulozPodily();
+      }
+      await ulozCekajiciZmeny();
+    } catch (error) {
+      sdileniAktivni = false;
+      if (!chybaSdileniZobrazena) {
+        console.error("Sdílený stav se nepodařilo načíst:", error);
+        chybaSdileniZobrazena = true;
+      }
+      nastavStavSdileni(
+        "Sdílení není dostupné; změny se zatím ukládají jen v tomto prohlížeči.",
+        true
+      );
+    } finally {
+      nacitaniSdilenehoStavu = false;
+    }
   }
 
   const formatujCenu = halere =>
@@ -199,9 +356,12 @@ if (typeof document !== "undefined") {
   }
 
   obnovPodily();
-  tabulka.addEventListener("input", () => {
+  tabulka.addEventListener("input", event => {
     aktualizujVysledek();
     ulozPodily();
+    if (event.target instanceof HTMLInputElement && event.target.matches("input.podil-kolecko")) {
+      naplanujUlozeniSdileneZmeny(event.target);
+    }
   });
   tabulka.addEventListener("wheel", event => {
     const input = event.target;
@@ -217,4 +377,6 @@ if (typeof document !== "undefined") {
   }, { passive: false });
 
   aktualizujVysledek();
+  synchronizujSdilenePodily();
+  window.setInterval(synchronizujSdilenePodily, 2500);
 }

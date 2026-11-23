@@ -11,7 +11,7 @@ from datetime import date
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request as UrlRequest, urlopen
 
 import segno
@@ -28,12 +28,105 @@ class GithubApiError(Exception):
         self.status = status
 
 
+class SupabaseApiError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
 def github_settings():
     repository = os.environ.get("GITHUB_REPOSITORY", "").strip().strip("/")
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not repository or not token or "/" not in repository:
         return None
     return repository, token
+
+
+def supabase_settings():
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not url or not key:
+        return None
+    return url, key
+
+
+def supabase_request(method, path, url, key, data=None, prefer=None):
+    body = None if data is None else json.dumps(data).encode("utf-8")
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Accept": "application/json",
+    }
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    if prefer:
+        headers["Prefer"] = prefer
+    request = UrlRequest(
+        url + path,
+        data=body,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            response_body = response.read()
+            return json.loads(response_body.decode("utf-8")) if response_body else None
+    except HTTPError as error:
+        try:
+            response_body = error.read()
+        finally:
+            error.close()
+        try:
+            response_data = json.loads(response_body.decode("utf-8"))
+            message = (
+                response_data.get("message", "Database request failed.")
+                if isinstance(response_data, dict)
+                else "Database request failed."
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = "Database request failed."
+        raise SupabaseApiError(error.code, message) from error
+    except URLError as error:
+        raise SupabaseApiError(None, "Database service is unreachable.") from error
+
+
+def get_shared_counters(event_slug):
+    settings = supabase_settings()
+    if not settings:
+        raise SupabaseApiError(None, "Shared storage is not configured.")
+    query = urlencode({
+        "select": "cell_key,value",
+        "event_slug": "eq." + event_slug,
+    })
+    rows = supabase_request(
+        "GET",
+        f"/rest/v1/event_counters?{query}",
+        settings[0],
+        settings[1],
+    )
+    return {row["cell_key"]: row["value"] for row in rows}
+
+
+def save_shared_counters(event_slug, values, ignore_duplicates=False):
+    settings = supabase_settings()
+    if not settings:
+        raise SupabaseApiError(None, "Shared storage is not configured.")
+    rows = [
+        {"event_slug": event_slug, "cell_key": cell_key, "value": value}
+        for cell_key, value in values.items()
+    ]
+    if not rows:
+        return
+    query = urlencode({"on_conflict": "event_slug,cell_key"})
+    resolution = "ignore-duplicates" if ignore_duplicates else "merge-duplicates"
+    supabase_request(
+        "POST",
+        f"/rest/v1/event_counters?{query}",
+        settings[0],
+        settings[1],
+        rows,
+        f"resolution={resolution},return=minimal",
+    )
 
 
 def github_request(method, path, token, data=None):
@@ -197,6 +290,17 @@ class ProjectHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        state_match = re.fullmatch(r"/api/state/([a-z0-9]+(?:-[a-z0-9]+)*)", path)
+        if state_match:
+            try:
+                self.send_json(200, {"values": get_shared_counters(state_match.group(1))})
+            except SupabaseApiError as error:
+                self.send_json(503, {"error": str(error)})
+            except Exception:
+                logging.exception("Unexpected error while reading shared counters")
+                self.send_json(502, {"error": "Sdílené počítadla se nepodařilo načíst."})
+            return
+
         page_match = re.fullmatch(r"/Akce/([a-z0-9]+(?:-[a-z0-9]+)*\.html)", path)
         settings = github_settings()
         if page_match and settings:
@@ -239,6 +343,10 @@ class ProjectHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        state_match = re.fullmatch(r"/api/state/([a-z0-9]+(?:-[a-z0-9]+)*)", path)
+        if state_match:
+            self.save_shared_counter_changes(state_match.group(1))
+            return
         if path == "/api/qr":
             self.create_qr()
             return
@@ -425,6 +533,62 @@ class ProjectHandler(SimpleHTTPRequestHandler):
         except Exception:
             logging.exception("Unexpected error while creating an event page")
             self.send_json(502, {"error": "Akci se nepodařilo uložit do GitHubu."})
+
+    def save_shared_counter_changes(self, event_slug):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.send_json(400, {"error": "Požadavek na sdílení není platný."})
+            return
+        if length <= 0 or length > 50000:
+            self.send_json(400, {"error": "Požadavek na sdílení není platný."})
+            return
+
+        try:
+            data = json.loads(self.rfile.read(length))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.send_json(400, {"error": "Požadavek na sdílení obsahuje neplatná data."})
+            return
+        if not isinstance(data, dict):
+            self.send_json(400, {"error": "Požadavek na sdílení není platný."})
+            return
+
+        initial_seed = isinstance(data.get("values"), dict)
+        if initial_seed:
+            values = data["values"]
+            if len(values) > 500:
+                self.send_json(400, {"error": "Požadavek obsahuje příliš mnoho počítadel."})
+                return
+        else:
+            values = {data.get("cell_key"): data.get("value")}
+
+        valid_values = all(
+            isinstance(cell_key, str)
+            and re.fullmatch(r"\d{1,5}:\d{1,4}", cell_key)
+            and isinstance(value, str)
+            and (
+                value == ""
+                or (
+                    value.isascii()
+                    and value.isdigit()
+                    and len(value) <= 3
+                    and int(value) <= 999
+                )
+            )
+            for cell_key, value in values.items()
+        )
+        if not values or not valid_values:
+            self.send_json(400, {"error": "Hodnota počítadla není platná."})
+            return
+
+        try:
+            save_shared_counters(event_slug, values, ignore_duplicates=initial_seed)
+            self.send_json(200, {"saved": True})
+        except SupabaseApiError as error:
+            self.send_json(503, {"error": str(error)})
+        except Exception:
+            logging.exception("Unexpected error while saving shared counters")
+            self.send_json(502, {"error": "Sdílené počítadlo se nepodařilo uložit."})
 
     def create_qr(self):
         try:

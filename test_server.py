@@ -21,6 +21,7 @@ from server import (
     make_qr_svg,
     normalize_account,
     read_github_page,
+    save_shared_counters,
 )
 
 
@@ -90,6 +91,60 @@ class PaymentQrTests(unittest.TestCase):
             server.shutdown()
             thread.join()
             server.server_close()
+
+    def test_shared_counter_api_reads_and_saves_values(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ProjectHandler)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            with patch(
+                "server.get_shared_counters",
+                return_value={"0:0": "2"},
+            ), patch("server.save_shared_counters") as save:
+                with urlopen(
+                    f"http://127.0.0.1:{server.server_port}/api/state/test-akce"
+                ) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(
+                        json.loads(response.read()),
+                        {"values": {"0:0": "2"}},
+                    )
+
+                request = Request(
+                    f"http://127.0.0.1:{server.server_port}/api/state/test-akce",
+                    data=json.dumps({"cell_key": "0:0", "value": "3"}).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urlopen(request) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(json.loads(response.read()), {"saved": True})
+
+            save.assert_called_once_with(
+                "test-akce",
+                {"0:0": "3"},
+                ignore_duplicates=False,
+            )
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+    def test_shared_counters_use_supabase_rest_api(self):
+        with patch(
+            "server.supabase_settings",
+            return_value=("https://project.supabase.co", "service-key"),
+        ), patch("server.supabase_request") as request:
+            save_shared_counters("test-akce", {"0:1": "4"})
+
+        request.assert_called_once_with(
+            "POST",
+            "/rest/v1/event_counters?on_conflict=event_slug%2Ccell_key",
+            "https://project.supabase.co",
+            "service-key",
+            [{"event_slug": "test-akce", "cell_key": "0:1", "value": "4"}],
+            "resolution=merge-duplicates,return=minimal",
+        )
 
     def test_normalizes_czech_account_to_iban(self):
         self.assertEqual(

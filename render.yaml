@@ -9,7 +9,9 @@ services:
         sync: false
       - key: GITHUB_TOKEN
         sync: false
-      - key: PUBLIC_SITE_URL
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: CORS_ORIGIN
         sync: false
