@@ -54,8 +54,12 @@ def list_github_pages(repository, token):
         f"/repos/{quote(owner)}/{quote(name)}/contents/Akce",
         token,
     )
+    public_site = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
     return [
-        {"title": item["name"][:-5], "path": "/Akce/" + item["name"]}
+        {
+            "title": item["name"][:-5],
+            "path": (public_site + "/Akce/" if public_site else "/Akce/") + item["name"],
+        }
         for item in result
         if item.get("type") == "file" and item.get("name", "").endswith(".html")
     ]
@@ -143,7 +147,6 @@ class ProjectHandler(SimpleHTTPRequestHandler):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", os.environ.get("CORS_ORIGIN", "*"))
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -395,7 +398,6 @@ class ProjectHandler(SimpleHTTPRequestHandler):
         svg = make_qr_svg(payload)
         self.send_response(200)
         self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", os.environ.get("CORS_ORIGIN", "*"))
         self.send_header("Content-Length", str(len(svg)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()

@@ -10,10 +10,34 @@ from unittest.mock import patch
 
 import segno
 
-from server import ProjectHandler, build_spayd_payload, make_qr_svg, normalize_account
+from server import (
+    ProjectHandler,
+    build_spayd_payload,
+    list_github_pages,
+    make_qr_svg,
+    normalize_account,
+)
 
 
 class PaymentQrTests(unittest.TestCase):
+    def test_github_page_links_include_project_pages_prefix(self):
+        with patch.dict(
+            "server.os.environ",
+            {"PUBLIC_SITE_URL": "https://248837-del.github.io/Akce"},
+        ), patch(
+            "server.github_request",
+            return_value=[{"type": "file", "name": "test-akce.html"}],
+        ):
+            pages = list_github_pages("248837-del/Akce", "token")
+
+        self.assertEqual(
+            pages,
+            [{
+                "title": "test-akce",
+                "path": "https://248837-del.github.io/Akce/Akce/test-akce.html",
+            }],
+        )
+
     def test_normalizes_czech_account_to_iban(self):
         self.assertEqual(
             normalize_account("19-2000145399/0800"),
