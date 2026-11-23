@@ -64,7 +64,7 @@
         <label for="Ucet">Účet plátce pro QR platby:</label><br>
         <input type="text" id="Ucet" name="Ucet"
           autocomplete="off" placeholder="např. 123456789/0001" disabled>
-        <p id="stavUctu" role="status">Nejprve vyber plátce.</p>
+        <p id="stavUctu" role="status">Nejprve vyber plátce. Účet se zadává pro každou akci zvlášť.</p>
       </div>
     </div>
   </form>
@@ -164,69 +164,25 @@ async function nactiLidi() {
   const platceSelect = document.getElementById('PlatceNakupu');
   const ucetInput = document.getElementById('Ucet');
   const stavUctu = document.getElementById('stavUctu');
-  const klicUctuPlatcu = 'ucty-platcu';
-  let uctyPlatcu = Object.create(null);
-  let lzeUkladatUcty = true;
 
   try {
-    const ulozeneUcty = localStorage.getItem(klicUctuPlatcu);
-    if (ulozeneUcty !== null) {
-      const nacteneUcty = JSON.parse(ulozeneUcty);
-      if (
-        !nacteneUcty ||
-        typeof nacteneUcty !== 'object' ||
-        Array.isArray(nacteneUcty) ||
-        Object.values(nacteneUcty).some(ucet => typeof ucet !== 'string')
-      ) {
-        throw new Error('Uložené účty nemají platný formát.');
-      }
-      uctyPlatcu = Object.assign(Object.create(null), nacteneUcty);
-    }
+    localStorage.removeItem('ucty-platcu');
   } catch (error) {
-    lzeUkladatUcty = false;
-    stavUctu.textContent = 'Účty plátců se nepodařilo načíst nebo uložit.';
-    console.error(error);
+    console.error('Dříve uložený účet se nepodařilo odstranit z prohlížeče.', error);
   }
 
   function aktualizujUcetPlatce() {
     const platce = platceSelect.value;
     ucetInput.disabled = !platce;
-    ucetInput.value = platce ? (uctyPlatcu[platce] || '') : '';
-    if (lzeUkladatUcty) {
-      stavUctu.textContent = platce
-        ? (ucetInput.value
-          ? 'Účet je uložen pro vybraného plátce v tomto prohlížeči.'
-          : 'Zadej účet plátce; uloží se pro příští akce.')
-        : 'Nejprve vyber plátce.';
-    }
+    stavUctu.textContent = platce
+      ? 'Zadej účet plátce pro tuto akci. Účet se neukládá.'
+      : 'Nejprve vyber plátce. Účet se zadává pro každou akci zvlášť.';
   }
 
-  ucetInput.addEventListener('change', () => {
-    const platce = platceSelect.value;
-    if (!platce || !lzeUkladatUcty) {
-      return;
-    }
-
-    const ucet = ucetInput.value.trim();
-    if (ucet) {
-      uctyPlatcu[platce] = ucet;
-    } else {
-      delete uctyPlatcu[platce];
-    }
-
-    try {
-      localStorage.setItem(klicUctuPlatcu, JSON.stringify(uctyPlatcu));
-      stavUctu.textContent = ucet
-        ? 'Účet plátce byl uložen pro další akce.'
-        : 'Účet plátce byl odebrán.';
-    } catch (error) {
-      lzeUkladatUcty = false;
-      stavUctu.textContent = 'Účet plátce se nepodařilo uložit.';
-      console.error(error);
-    }
+  platceSelect.addEventListener('change', () => {
+    ucetInput.value = '';
+    aktualizujUcetPlatce();
   });
-
-  platceSelect.addEventListener('change', aktualizujUcetPlatce);
 
   function aktualizujPlatce() {
     const puvodniPlatce = platceSelect.value;
@@ -239,6 +195,8 @@ async function nactiLidi() {
 
     if (vybrani.some(checkbox => checkbox.value === puvodniPlatce)) {
       platceSelect.value = puvodniPlatce;
+    } else {
+      ucetInput.value = '';
     }
     aktualizujUcetPlatce();
     aktualizujTlacitkoVyberu();
