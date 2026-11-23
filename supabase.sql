@@ -7,3 +7,6 @@ create table if not exists public.event_counters (
 );
 
 alter table public.event_counters enable row level security;
+
+grant usage on schema public to service_role;
+grant select, insert, update on table public.event_counters to service_role;
