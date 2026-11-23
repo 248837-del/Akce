@@ -3,6 +3,7 @@ import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from io import BytesIO
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -12,7 +13,9 @@ import segno
 
 from server import (
     ProjectHandler,
+    GithubApiError,
     build_spayd_payload,
+    github_request,
     list_github_pages,
     make_qr_svg,
     normalize_account,
@@ -20,6 +23,22 @@ from server import (
 
 
 class PaymentQrTests(unittest.TestCase):
+    def test_github_api_error_preserves_safe_status_and_message(self):
+        error = HTTPError(
+            "https://api.github.com/test",
+            403,
+            "Forbidden",
+            hdrs=None,
+            fp=BytesIO(b'{"message":"Resource not accessible"}'),
+        )
+        with patch("server.urlopen", side_effect=error):
+            with self.assertRaises(GithubApiError) as raised:
+                github_request("PUT", "/test", "secret-token", {})
+        error.close()
+
+        self.assertEqual(raised.exception.status, 403)
+        self.assertEqual(str(raised.exception), "Resource not accessible")
+
     def test_github_page_links_include_project_pages_prefix(self):
         with patch.dict(
             "server.os.environ",

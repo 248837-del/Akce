@@ -1,6 +1,7 @@
 import html
 import io
 import json
+import logging
 import re
 import math
 import os
@@ -9,6 +10,7 @@ import unicodedata
 from datetime import date
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request as UrlRequest, urlopen
 
@@ -18,6 +20,12 @@ import segno
 ROOT = Path(__file__).resolve().parent
 PAGES_DIR = ROOT / "Akce"
 GITHUB_API = "https://api.github.com"
+
+
+class GithubApiError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
 
 
 def github_settings():
@@ -43,8 +51,26 @@ def github_request(method, path, token, data=None):
         headers=headers,
         method=method,
     )
-    with urlopen(request, timeout=15) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        try:
+            response_body = error.read()
+        finally:
+            error.close()
+        try:
+            response_data = json.loads(response_body.decode("utf-8"))
+            message = (
+                response_data.get("message", "GitHub request failed.")
+                if isinstance(response_data, dict)
+                else "GitHub request failed."
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = "GitHub request failed."
+        raise GithubApiError(error.code, message) from error
+    except URLError as error:
+        raise GithubApiError(None, "GitHub API is unreachable.") from error
 
 
 def list_github_pages(repository, token):
@@ -361,10 +387,17 @@ class ProjectHandler(SimpleHTTPRequestHandler):
 
         except (json.JSONDecodeError, UnicodeDecodeError):
             self.send_json(400, {"error": "Požadavek obsahuje neplatná data."})
-        except Exception:
-            self.send_json(502, {"error": "Akci se nepodařilo uložit do GitHubu."})
+        except GithubApiError as error:
+            status = f" ({error.status})" if error.status else ""
+            self.send_json(
+                502,
+                {"error": f"GitHub odmítl požadavek{status}: {error}"},
+            )
         except OSError as error:
             self.send_json(500, {"error": "Soubor se nepodařilo uložit: " + str(error)})
+        except Exception:
+            logging.exception("Unexpected error while creating an event page")
+            self.send_json(502, {"error": "Akci se nepodařilo uložit do GitHubu."})
 
     def create_qr(self):
         try:
